@@ -20,4 +20,4 @@ backend/.pytest_cache/
 Thumbs.db
 
 # Cache
-backend/app/fastf1_cache/
+backend/fastf1_cache/
