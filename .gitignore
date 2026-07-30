@@ -1,0 +1,23 @@
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.*
+frontend/.eslintcache
+
+# Backend
+venv/
+backend/__pycache__/
+backend/.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+
+# IDEs & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Cache
+backend/app/fastf1_cache/

@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background-color: #0b0f17;
+    color: #f1f5f9;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0b0f17;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+  }
+}
+
+@layer components {
+  .pitwall-card {
+    @apply bg-pitwall-card border border-pitwall-border rounded-xl;
+  }
+
+  .pitwall-card-header {
+    @apply text-sm font-semibold uppercase tracking-wider text-slate-400 border-b border-pitwall-border px-5 py-3;
+  }
+
+  .slider-track {
+    @apply w-full h-1.5 rounded-full appearance-none cursor-pointer bg-slate-700/60;
+  }
+
+  .slider-track::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #22d3ee;
+    border: 2px solid #0b0f17;
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.4);
+    cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.15s;
+  }
+
+  .slider-track::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 14px rgba(34, 211, 238, 0.7);
+    transform: scale(1.15);
+  }
+
+  .slider-track::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #22d3ee;
+    border: 2px solid #0b0f17;
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.4);
+    cursor: pointer;
+  }
+
+  .delta-positive {
+    @apply text-neon-emerald;
+  }
+  .delta-negative {
+    @apply text-neon-crimson;
+  }
+  .delta-neutral {
+    @apply text-slate-400;
+  }
+
+  .neon-badge {
+    @apply inline-flex items-center gap-1.5 text-xs font-mono font-medium px-2.5 py-1 rounded-full;
+  }
+
+  .btn-primary {
+    @apply flex items-center justify-center gap-2 bg-neon-cyan/15 text-neon-cyan border border-neon-cyan/30
+           font-semibold text-sm px-5 py-2.5 rounded-lg transition-all duration-200
+           hover:bg-neon-cyan/25 hover:border-neon-cyan/50 hover:shadow-[0_0_20px_rgba(34,211,238,0.15)]
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-neon-cyan/15 disabled:hover:border-neon-cyan/30 disabled:hover:shadow-none;
+  }
+
+  .btn-danger {
+    @apply flex items-center justify-center gap-2 bg-neon-crimson/10 text-neon-crimson border border-neon-crimson/30
+           font-semibold text-sm px-5 py-2.5 rounded-lg transition-all duration-200
+           hover:bg-neon-crimson/20 hover:border-neon-crimson/50;
+  }
+}

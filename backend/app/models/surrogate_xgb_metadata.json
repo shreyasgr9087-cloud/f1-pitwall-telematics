@@ -1,0 +1,111 @@
+{
+  "feature_names": [
+    "camber_front",
+    "tire_pressure_psi",
+    "brake_bias",
+    "driving_style_aggression",
+    "TrackTemp",
+    "AirTemp"
+  ],
+  "target": "effective_wear_rate",
+  "training_data_hash": "05cf4a830067a2b43106164b7b9ef851f52a17d9d90a317ae597c5ad12e46833",
+  "trained_at": "2026-07-30T10:42:54.875228+00:00",
+  "holdout_rmse": 0.8418322397246577,
+  "holdout_r2": 0.9809692208557439,
+  "n_train_samples": 4000,
+  "n_test_samples": 1000,
+  "residual_stats": {
+    "mae": 0.6078916521524487,
+    "p95_abs_error": 1.8658039001474114,
+    "max_abs_error": 3.8778625562786715,
+    "mae_short_stint_q25": 0.28719055740059174,
+    "mae_long_stint_q75": 1.037590905360531,
+    "worst_case_row": {
+      "camber_front": -1.8061060594566345,
+      "tire_pressure_psi": 23.900660657476283,
+      "brake_bias": 54.18256375366413,
+      "driving_style_aggression": 0.8380655600320861,
+      "TrackTemp": 30.94105960264901,
+      "AirTemp": 21.473509933774835,
+      "y_true_laps": 40.051503761112656,
+      "y_pred_laps": 36.173641204833984,
+      "abs_error": 3.8778625562786715
+    }
+  },
+  "residual_by_region": [
+    {
+      "bin_index": 0,
+      "lower": -Infinity,
+      "upper": 14.713117825004058,
+      "n": 250,
+      "mae": 0.28719055740059174,
+      "p95_abs_error": 0.7045735369163183
+    },
+    {
+      "bin_index": 1,
+      "lower": 14.713117825004058,
+      "upper": 19.561373365739097,
+      "n": 250,
+      "mae": 0.4562402932999313,
+      "p95_abs_error": 1.146334261760403
+    },
+    {
+      "bin_index": 2,
+      "lower": 19.561373365739097,
+      "upper": 24.081577569896968,
+      "n": 250,
+      "mae": 0.6505448525487402,
+      "p95_abs_error": 1.6173948585810782
+    },
+    {
+      "bin_index": 3,
+      "lower": 24.081577569896968,
+      "upper": Infinity,
+      "n": 250,
+      "mae": 1.037590905360531,
+      "p95_abs_error": 2.4825888291512044
+    }
+  ],
+  "model_params": {
+    "objective": "reg:squarederror",
+    "base_score": null,
+    "booster": null,
+    "callbacks": null,
+    "colsample_bylevel": null,
+    "colsample_bynode": null,
+    "colsample_bytree": null,
+    "device": null,
+    "early_stopping_rounds": null,
+    "enable_categorical": false,
+    "eval_metric": null,
+    "feature_types": null,
+    "feature_weights": null,
+    "gamma": null,
+    "grow_policy": null,
+    "importance_type": null,
+    "interaction_constraints": null,
+    "learning_rate": 0.1,
+    "max_bin": null,
+    "max_cat_threshold": null,
+    "max_cat_to_onehot": null,
+    "max_delta_step": null,
+    "max_depth": 5,
+    "max_leaves": null,
+    "min_child_weight": null,
+    "missing": NaN,
+    "monotone_constraints": null,
+    "multi_strategy": null,
+    "n_estimators": 150,
+    "n_jobs": null,
+    "num_parallel_tree": null,
+    "random_state": 42,
+    "reg_alpha": null,
+    "reg_lambda": null,
+    "sampling_method": null,
+    "scale_pos_weight": null,
+    "subsample": null,
+    "tree_method": null,
+    "validate_parameters": null,
+    "verbosity": null
+  }
+}
