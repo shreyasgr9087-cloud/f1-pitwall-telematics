@@ -8,62 +8,66 @@
     "AirTemp"
   ],
   "target": "effective_wear_rate",
-  "training_data_hash": "05cf4a830067a2b43106164b7b9ef851f52a17d9d90a317ae597c5ad12e46833",
-  "trained_at": "2026-07-30T10:42:54.875228+00:00",
-  "holdout_rmse": 0.8418322397246577,
-  "holdout_r2": 0.9809692208557439,
+  "training_data_hash": "869f5e45564da5f3dbfbfcbaa5ebee2a068c0b3fcb6a13b8c5563b4d4fc9bd1b",
+  "trained_at": "2026-08-01T09:01:15.188819+00:00",
+  "holdout_rmse": 0.8491216453992518,
+  "holdout_r2": 0.9806814911616898,
+  "bayes_ceiling_r2_laps": 0.9859502281430974,
+  "bayes_ceiling_rmse_laps": 0.7241320128381856,
+  "model_pct_of_ceiling": 99.5,
+  "generator_noise_std": 0.1,
   "n_train_samples": 4000,
   "n_test_samples": 1000,
   "residual_stats": {
-    "mae": 0.6078916521524487,
-    "p95_abs_error": 1.8658039001474114,
-    "max_abs_error": 3.8778625562786715,
-    "mae_short_stint_q25": 0.28719055740059174,
-    "mae_long_stint_q75": 1.037590905360531,
+    "mae": 0.6219551658076707,
+    "p95_abs_error": 1.807330183270467,
+    "max_abs_error": 4.408737154498262,
+    "mae_short_stint_q25": 0.34253241232766163,
+    "mae_long_stint_q75": 1.0587155139342859,
     "worst_case_row": {
-      "camber_front": -1.8061060594566345,
-      "tire_pressure_psi": 23.900660657476283,
-      "brake_bias": 54.18256375366413,
-      "driving_style_aggression": 0.8380655600320861,
-      "TrackTemp": 30.94105960264901,
-      "AirTemp": 21.473509933774835,
-      "y_true_laps": 40.051503761112656,
-      "y_pred_laps": 36.173641204833984,
-      "abs_error": 3.8778625562786715
+      "camber_front": -2.3131823996845284,
+      "tire_pressure_psi": 24.0919664378565,
+      "brake_bias": 52.1111504508673,
+      "driving_style_aggression": 0.8691878098412301,
+      "TrackTemp": 31.01180124223602,
+      "AirTemp": 27.43167701863354,
+      "y_true_laps": 39.07220074702756,
+      "y_pred_laps": 34.6634635925293,
+      "abs_error": 4.408737154498262
     }
   },
   "residual_by_region": [
     {
       "bin_index": 0,
       "lower": -Infinity,
-      "upper": 14.713117825004058,
+      "upper": 14.747834426081052,
       "n": 250,
-      "mae": 0.28719055740059174,
-      "p95_abs_error": 0.7045735369163183
+      "mae": 0.34253241232766163,
+      "p95_abs_error": 0.7883252917830044
     },
     {
       "bin_index": 1,
-      "lower": 14.713117825004058,
-      "upper": 19.561373365739097,
+      "lower": 14.747834426081052,
+      "upper": 19.522446526311825,
       "n": 250,
-      "mae": 0.4562402932999313,
-      "p95_abs_error": 1.146334261760403
+      "mae": 0.45477837005611,
+      "p95_abs_error": 1.1156415868607283
     },
     {
       "bin_index": 2,
-      "lower": 19.561373365739097,
-      "upper": 24.081577569896968,
+      "lower": 19.522446526311825,
+      "upper": 23.998598835036148,
       "n": 250,
-      "mae": 0.6505448525487402,
-      "p95_abs_error": 1.6173948585810782
+      "mae": 0.6317943669126255,
+      "p95_abs_error": 1.5291394212481049
     },
     {
       "bin_index": 3,
-      "lower": 24.081577569896968,
+      "lower": 23.998598835036148,
       "upper": Infinity,
       "n": 250,
-      "mae": 1.037590905360531,
-      "p95_abs_error": 2.4825888291512044
+      "mae": 1.0587155139342859,
+      "p95_abs_error": 2.4025171605748987
     }
   ],
   "model_params": {

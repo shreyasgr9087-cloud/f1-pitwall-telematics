@@ -137,6 +137,15 @@ class TelemetryRecourseEngine:
             ])
         else:
             spread = 0.0
+
+        # Stability thresholds: these are empirically calibrated placeholders based on
+        # observed restart spreads during development. They are NOT derived from a
+        # rigorous statistical analysis of the optimization landscape. The intuition:
+        #   < 0.1 normalized L1 distance → restarts converge tightly → "stable"
+        #   0.1–0.3 → moderate variation between restarts → "moderate"
+        #   > 0.3 → restarts find substantially different optima → "unstable"
+        # If these do not match your problem's observed spread distribution, tune them
+        # by running bench_optimizer.py across a sample of setups/targets.
         stability = "stable" if spread < 0.1 else ("moderate" if spread < 0.3 else "unstable")
 
         if best_predicted_laps < target_laps - feasibility_tolerance:

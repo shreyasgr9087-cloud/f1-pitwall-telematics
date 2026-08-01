@@ -29,6 +29,52 @@ FEATURES = [
 # Train on wear rate directly to avoid reciprocal distortion
 TARGET = "effective_wear_rate"
 
+# The noise std used in hybrid_physics_generator.py (line 62).
+# This is the irreducible noise floor; even a perfect model cannot eliminate it.
+GENERATOR_NOISE_STD = 0.1
+
+
+def compute_bayes_ceiling(y_test_wear_rate, n_mc=5000, seed=99):
+    """
+    Computes the theoretical best-possible R²/RMSE a perfect model could achieve,
+    given the known Gaussian noise floor (σ=0.1) injected in wear-rate space.
+
+    Method: For each holdout sample, the "true" noiseless wear rate is unknown,
+    but the observed wear rate = noiseless + N(0, σ). A perfect model would predict
+    the noiseless value exactly. The irreducible error in laps-space is therefore
+    caused solely by the noise propagating through the 70/w reciprocal transform.
+
+    We estimate this via Monte Carlo: for each observed w, draw MC samples of the
+    noise ε ~ N(0, σ), compute laps_noisy = 70/(w) vs laps_clean = 70/(w - ε),
+    and measure the residual. This gives the Bayes-optimal error floor.
+    """
+    rng = np.random.default_rng(seed)
+    y_laps_observed = 70.0 / y_test_wear_rate
+
+    # For each sample, the noiseless wear rate is w_obs - ε where ε ~ N(0, σ)
+    # A perfect model predicts w_noiseless = w_obs - ε, so its lap prediction
+    # would be 70/(w_obs - ε). The "true" laps we evaluate against is 70/w_obs.
+    # The irreducible squared error per sample is E[(70/w_obs - 70/(w_obs - ε))²].
+    sq_errors = []
+    for w_obs in y_test_wear_rate:
+        eps_samples = rng.normal(0, GENERATOR_NOISE_STD, n_mc)
+        w_clean = np.maximum(0.001, w_obs - eps_samples)
+        laps_clean = 70.0 / w_clean
+        laps_observed = 70.0 / w_obs
+        sq_errors.append(np.mean((laps_observed - laps_clean) ** 2))
+
+    ceiling_mse = np.mean(sq_errors)
+    ceiling_rmse = np.sqrt(ceiling_mse)
+
+    # Bayes-optimal R² in laps space
+    ss_tot = np.sum((y_laps_observed - y_laps_observed.mean()) ** 2)
+    # The irreducible variance sets a floor on SS_res
+    ss_res_floor = ceiling_mse * len(y_laps_observed)
+    ceiling_r2 = 1.0 - (ss_res_floor / ss_tot)
+
+    return float(ceiling_r2), float(ceiling_rmse)
+
+
 def hash_dataframe(df: pd.DataFrame) -> str:
     data_bytes = pd.util.hash_pandas_object(df, index=True).values.tobytes()
     return hashlib.sha256(data_bytes).hexdigest()
@@ -130,9 +176,16 @@ def train_surrogate():
     rmse = float(np.sqrt(mean_squared_error(y_test_laps, predictions_laps)))
     r2 = float(r2_score(y_test_laps, predictions_laps))
 
+    # Bayes ceiling: the best any model could achieve given the noise floor
+    ceiling_r2, ceiling_rmse = compute_bayes_ceiling(y_test.values)
+    pct_of_ceiling = (r2 / ceiling_r2) * 100.0 if ceiling_r2 > 0 else 0.0
+
     print("\n--- Model Evaluation (holdout set evaluated in laps) ---")
-    print(f"RMSE (Laps): {rmse:.2f}")
-    print(f"R² Score:    {r2:.4f}")
+    print(f"RMSE (Laps):           {rmse:.2f}")
+    print(f"R^2 Score:             {r2:.4f}")
+    print(f"Bayes Ceiling R^2:     {ceiling_r2:.4f}  (irreducible noise floor sigma={GENERATOR_NOISE_STD})")
+    print(f"Bayes Ceiling RMSE:    {ceiling_rmse:.4f} laps")
+    print(f"Model % of ceiling:    {pct_of_ceiling:.1f}%")
     print("---------------------------------------")
 
     residual_stats = residual_analysis(y_test_laps, predictions_laps, X_test)
@@ -154,6 +207,10 @@ def train_surrogate():
         "trained_at": datetime.now(timezone.utc).isoformat(),
         "holdout_rmse": rmse,
         "holdout_r2": r2,
+        "bayes_ceiling_r2_laps": ceiling_r2,
+        "bayes_ceiling_rmse_laps": ceiling_rmse,
+        "model_pct_of_ceiling": round(pct_of_ceiling, 1),
+        "generator_noise_std": GENERATOR_NOISE_STD,
         "n_train_samples": int(len(X_train)),
         "n_test_samples": int(len(X_test)),
         "residual_stats": residual_stats,

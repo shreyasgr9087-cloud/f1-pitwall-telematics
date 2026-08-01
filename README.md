@@ -29,10 +29,13 @@
   - [Differential Evolution Recourse with L1 Penalty](#3-differential-evolution-recourse-with-l1-penalty)
   - [Graceful Edge-Case Handling](#4-graceful-edge-case-handling)
 - [System Architecture](#system-architecture)
+- [Synthetic Data Disclosure](#synthetic-data-disclosure)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Local Setup & Installation](#local-setup--installation)
+- [Test Suite](#test-suite)
 - [API Reference](#api-reference)
+- [Known Issues / Engineering Trade-offs](#known-issues--engineering-trade-offs)
 - [Author](#author)
 
 ---
@@ -83,7 +86,7 @@ predicted_wear_rate = max(0.001, predicted_wear_rate)  # safeguard
 predicted_laps = float(70.0 / predicted_wear_rate)
 ```
 
-**Result:** Holdout R² of **0.98+** with uniform residual distribution across all stint lengths.
+**Result:** Holdout R² of **0.981** — capturing **99.5%** of the Bayes-optimal ceiling (R² = 0.986), meaning virtually no learnable signal remains on the table. The remaining error is irreducible noise from the data generation process (σ = 0.1 in wear-rate space).
 
 ---
 
@@ -91,16 +94,20 @@ predicted_laps = float(70.0 / predicted_wear_rate)
 
 Point estimates are dangerous. A prediction of *"18.5 laps"* without context is operationally meaningless — a race engineer needs to know *how much to trust it*.
 
-Rather than fitting a parametric uncertainty model (which would impose distributional assumptions), this system computes **empirical residual statistics** from the holdout test set, binned by prediction region:
+Rather than fitting a parametric uncertainty model (which would impose distributional assumptions), this system computes **empirical residual statistics** from the holdout test set, binned by prediction region.
+
+The values below are read directly from the shipped model artifact (`surrogate_xgb_metadata.json`), not hand-typed illustrative numbers. If you retrain the model, these will update accordingly:
 
 ```
-Region [−∞, Q25) laps:  n=250, MAE=0.49, P95=1.16
-Region [Q25, Q50) laps:  n=250, MAE=0.52, P95=1.28
-Region [Q50, Q75) laps:  n=250, MAE=0.58, P95=1.42
-Region [Q75, +∞]  laps:  n=250, MAE=0.62, P95=1.58
+Region [−∞, 14.7)  laps:  n=250, MAE=0.343, P95=0.788
+Region [14.7, 19.5) laps:  n=250, MAE=0.455, P95=1.116
+Region [19.5, 24.0) laps:  n=250, MAE=0.632, P95=1.529
+Region [24.0, +∞]   laps:  n=250, MAE=1.059, P95=2.403
 ```
 
-These regional stats are embedded in the model's metadata sidecar (`surrogate_xgb_metadata.json`) and surfaced dynamically by the recourse API. The frontend renders them as **confidence corridors** on the degradation chart — the MAE band (tight, high-confidence) nested inside the P95 band (wider, worst-case).
+Note the monotonic increase in MAE from short stints (0.343) to long stints (1.059) — this is the expected consequence of the reciprocal transform amplifying wear-rate errors at lower wear rates, and it is why we train on wear rate rather than laps.
+
+These regional stats are embedded in the model's metadata sidecar and surfaced dynamically by the recourse API. The frontend renders them as **confidence corridors** on the degradation chart — the MAE band (tight, high-confidence) nested inside the P95 band (wider, worst-case).
 
 This is **Option B uncertainty** — honest, empirical, and non-parametric.
 
@@ -127,7 +134,9 @@ Where:
 
 **Why L1 over L2?** L1 norm produces **sparse** adjustments — the optimizer will zero out changes on features that don't help, resulting in recommendations like *"change only pressure by +2.1 PSI"* rather than touching all three parameters. This maps directly to how real pit-wall setup changes work: fewer clicks = fewer mistakes under pressure.
 
-**Multi-Seed Stability:** Each optimization runs $n$ Differential Evolution restarts (default: 5) with different random seeds. The spread between solutions is measured as a normalized L1 distance. If the spread is < 0.1, the landscape is **stable** (single clear optimum). If > 0.3, the landscape is **unstable** (multiple local optima) — the UI flags this with an amber warning badge.
+**Why only 3 of 6 features are optimizable:** The model ingests 6 features, but only 3 are exposed to the recourse optimizer: `camber_front`, `tire_pressure_psi`, and `brake_bias`. The remaining 3 — `driving_style_aggression`, `TrackTemp`, `AirTemp` — are held fixed as **context features**. This is a deliberate design choice reflecting physical actionability: a race engineer can adjust mechanical setup parameters between stints, but they cannot control the weather (TrackTemp, AirTemp) or fundamentally change how a driver brakes and steers mid-race (aggression). The optimizer searches only the space of mechanically actionable "clicks."
+
+**Multi-Seed Stability:** Each optimization runs $n$ Differential Evolution restarts (default: 5) with different random seeds. The spread between solutions is measured as a normalized L1 distance. If the spread is < 0.1, the landscape is **stable** (single clear optimum). If > 0.3, the landscape is **unstable** (multiple local optima) — the UI flags this with an amber warning badge. These thresholds are empirically calibrated placeholders based on observed restart spreads during development; see the code comment in `recourse_engine.py` for full provenance.
 
 ---
 
@@ -206,6 +215,7 @@ This ensures the system **never silently fails** — it either delivers a valid 
 │  │  • Model artifact   • Feature schema                    │   │
 │  │  • R² = 0.98+       • Regional residual stats           │   │
 │  │                     • Training data SHA256 hash          │   │
+│  │                     • Bayes ceiling metrics              │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐   │
@@ -215,6 +225,18 @@ This ensures the system **never silently fails** — it either delivers a valid 
 │  └──────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Synthetic Data Disclosure
+
+**The Physics Engine is a Heuristic Approximation, Not a Physical Model.**
+
+The tire degradation model in `hybrid_physics_generator.py` uses a self-authored multiplicative penalty formula to generate `effective_wear_rate` from the 6 input features. This formula is **not** derived from published tire-degradation literature, finite-element models, or real proprietary telemetry data. It is a hand-tuned heuristic designed to exhibit physically plausible monotonic behaviors (e.g., higher aggression → higher wear, extreme pressures → higher wear).
+
+The only real-world data in the pipeline is the **ambient temperature context** (TrackTemp, AirTemp), which is pulled from actual 2023 FastF1 race weather for Monza, Silverstone, Spa, Bahrain, and Suzuka. Everything else — the penalty coefficients, the wear-rate baseline, and the Gaussian noise (σ = 0.1) — is synthetic.
+
+**Why synthetic data is the right choice here:** The purpose of this project is to demonstrate the ML/recourse pipeline — the reciprocal transform insight, the L1-penalized optimization, the regional uncertainty quantification, and the full-stack dashboard integration. Using synthetic data with known ground truth allows us to compute the Bayes-optimal ceiling (which we cannot do with real noisy data of unknown noise structure), validate that the model captures 99.5% of learnable signal, and test edge cases like unreachable targets with full control. If this system were deployed with real Pirelli test-rig data, the architecture would remain identical; only the data source and noise characteristics would change.
 
 ---
 
@@ -228,6 +250,7 @@ This ensures the system **never silently fails** — it either delivers a valid 
 | **Counterfactual Recourse** | *"Make my tires last 22 laps"* → engine computes minimal setup clicks via Differential Evolution. |
 | **Optimization Diagnostics** | Stability badge (stable / moderate / unstable), restart spread, penalty weight, and best objective value — all surfaced in the UI. |
 | **Unreachable Target Handling** | Impossible targets return a structured 422 error showing the physical ceiling and one-click re-targeting. |
+| **Bayes Ceiling Audit** | Model metadata includes the theoretical best-possible R² given the known noise floor, proving 99.5% of learnable signal is captured. |
 | **Model Health Monitoring** | Header polls `/health` every 10s, displaying model R², training timestamp, and API connection status with animated pulse indicator. |
 | **Dark Pit-Wall Aesthetic** | Deep slate (#0B0F17) background, translucent cards, neon status indicators (emerald/amber/crimson), JetBrains Mono telemetry readouts. |
 
@@ -244,6 +267,7 @@ This ensures the system **never silently fails** — it either delivers a valid 
 | **SciPy** | `differential_evolution` optimizer for recourse |
 | **FastF1** | Real Formula 1 telemetry and weather data ingestion |
 | **Pandas / NumPy** | Data manipulation and numerical computation |
+| **pytest** | Test suite for recourse engine validation |
 
 ### Frontend
 | Technology | Role |
@@ -266,8 +290,8 @@ This ensures the system **never silently fails** — it either delivers a valid 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/shreyasgr9087-cloud/sim-racing-telematics.git
-cd sim-racing-telematics
+git clone https://github.com/shreyasgr9087-cloud/f1-pitwall-telematics.git
+cd f1-pitwall-telematics
 ```
 
 ### 2. Backend Setup
@@ -296,7 +320,7 @@ You should see output confirming:
 - Dataset saved to `backend/app/data/hybrid_stint_telemetry.csv` (5000 rows)
 - Model saved to `backend/app/models/surrogate_xgb.pkl`
 - Metadata sidecar saved to `backend/app/models/surrogate_xgb_metadata.json`
-- Holdout R² ≈ 0.98
+- Holdout R² ≈ 0.98, Bayes ceiling R² ≈ 0.986, Model captures ~99.5% of ceiling
 
 ### 4. Start the Backend
 
@@ -317,6 +341,28 @@ npm run dev
 Open: [http://localhost:5173](http://localhost:5173)
 
 > **CORS Note:** The backend explicitly allows origins on ports `5173` and `5174`. If Vite auto-increments to a different port (because 5173 is occupied), either kill the lingering process or add the new port to `allow_origins` in `backend/app/main.py`.
+
+---
+
+## Test Suite
+
+The recourse engine is validated by 7 targeted pytest cases in `backend/app/test_recourse_engine.py`:
+
+```bash
+python -m pytest backend/app/test_recourse_engine.py -v
+```
+
+| Test | What It Validates |
+|------|-------------------|
+| `test_predictions_are_physically_sane` | Predicted laps are always positive and finite |
+| `test_recommended_fix_respects_bounds` | All recourse outputs stay within declared physical bounds |
+| `test_fixed_features_remain_untouched` | Context features (TrackTemp, AirTemp, aggression) never appear in `setup_changes` |
+| `test_infeasible_target_raises_correctly` | Unreachable targets raise `UnreachableTargetError` with valid `best_achievable_laps` |
+| `test_already_optimal_trivial_case` | When current setup already exceeds target, changes are near-zero |
+| `test_l1_sparsity` | For modest improvements, L1 penalty produces at least one near-zero feature change |
+| `test_stability_classification` | Stability label (stable/moderate/unstable) matches documented spread thresholds |
+
+All 7 tests pass (65s total, dominated by DE optimization runs).
 
 ---
 
@@ -374,23 +420,47 @@ Computes optimal setup adjustments to reach a target stint length.
 
 ---
 
+## Known Issues / Engineering Trade-offs
+
+### Optimizer Speed vs. Robustness
+
+`bench_optimizer.py` compares Differential Evolution (production) against multi-start SLSQP:
+
+| Scenario | DE Objective | SLSQP Objective | DE Time | SLSQP Time |
+|----------|:-----------:|:---------------:|:-------:|:----------:|
+| Mid-range, moderate target | 0.000 | 0.000 | 12.2s | 1.1s |
+| Harsh setup, ambitious target | **0.111** | 0.122 | 9.9s | 2.3s |
+| Gentle setup, easy target | 0.000 | 0.000 | 12.7s | 1.2s |
+
+**Takeaway:** SLSQP is ~5-10× faster, and both methods find identical optima on well-conditioned (easy/moderate) problems. DE wins on hard landscapes (harsh setup) where the non-differentiable XGBoost step boundaries cause SLSQP's finite-difference gradients to miss the true minimum. Since correctness on edge cases matters more than wall-clock time for a pit-wall tool, DE remains the production default.
+
+### Other Known Limitations
+
+- **Stationary assumption:** The model assumes track temperatures remain constant throughout a stint. Real races have cooling tracks, rain, and safety-car periods that change ambient conditions mid-stint.
+- **No temporal dynamics:** Tire wear is a cumulative time-series process (e.g., graining can clear after 5 laps). The surrogate is a static point-in-time predictor.
+- **Stability thresholds are heuristic:** The 0.1 / 0.3 spread thresholds for the stable/moderate/unstable classification were empirically calibrated during development, not derived from a rigorous statistical analysis of the optimization landscape. See the inline comment in `recourse_engine.py` for full provenance.
+
+---
+
 ## Project Structure
 
 ```
-sim-racing-telematics/
+f1-pitwall-telematics/
 ├── backend/
 │   ├── app/
 │   │   ├── data/
 │   │   │   └── hybrid_stint_telemetry.csv       # 5000-row training dataset
 │   │   ├── models/
 │   │   │   ├── surrogate_xgb.pkl                # Trained XGBoost model
-│   │   │   └── surrogate_xgb_metadata.json      # Schema, residuals, hash
+│   │   │   └── surrogate_xgb_metadata.json      # Schema, residuals, hash, Bayes ceiling
 │   │   ├── routers/
 │   │   │   ├── predict.py                        # /api/predict/ endpoint
 │   │   │   └── recourse.py                       # /api/recourse/ endpoint
-│   │   ├── hybrid_physics_generator.py           # FastF1 data + physics model
-│   │   ├── train_model.py                        # XGBoost training pipeline
+│   │   ├── hybrid_physics_generator.py           # FastF1 data + physics heuristics
+│   │   ├── train_model.py                        # XGBoost training + Bayes ceiling
 │   │   ├── recourse_engine.py                    # DE optimization engine
+│   │   ├── test_recourse_engine.py               # pytest suite (7 tests)
+│   │   ├── bench_optimizer.py                    # DE vs SLSQP benchmark
 │   │   └── main.py                               # FastAPI app + lifespan
 │   └── requirements.txt
 └── frontend/
